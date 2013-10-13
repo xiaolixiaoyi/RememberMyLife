@@ -7,7 +7,7 @@ import com.remmylife.head.*;
 public class VoiceDiary extends Diary
 {
 	private String voiceName = null;//音频名
-	private Byte[] voice = null;//音频字节数组
+	private byte[] voice = null;//音频字节数组
 	private String note = null;
 	
 	public VoiceDiary()
@@ -27,6 +27,22 @@ public class VoiceDiary extends Diary
 		super(id, DiaryType.VOICE_DIARY, title, date, weather);
 	}
 	
+	
+	public VoiceDiary(int id, String title, Date date, Weather weather,String note,String voiceName)
+	{
+		super(id, DiaryType.VOICE_DIARY, title, date, weather);
+		this.setNote(note);
+		this.setVoiceName(voiceName);
+	}
+	
+	public VoiceDiary(int id, String title, Date date, Weather weather,
+			String note2, String voicename, byte[] voice) {
+		super(id, DiaryType.VOICE_DIARY, title, date, weather);
+		this.setNote(note2);
+		this.setVoiceName(voiceName);
+		this.setVoice(voice);
+	}
+
 	public void setVoiceName(String voiceName)
 	{
 		this.voiceName = voiceName;
@@ -37,11 +53,11 @@ public class VoiceDiary extends Diary
 		return this.voiceName;
 	}
 	
-	public void setVoice(Byte[] voice)
+	public void setVoice(byte[] voice)
 	{
-		if(voice.length != 0)
+		if(voice != null && voice.length != 0)
 		{
-			this.voice = new Byte[voice.length];
+			this.voice = new byte[voice.length];
 			for(int i = 0; i < voice.length; ++ i)
 			{
 				this.voice[i] = voice[i];
@@ -49,7 +65,7 @@ public class VoiceDiary extends Diary
 		}
 	}
 	
-	public Byte[] getVoice()
+	public byte[] getVoice()
 	{
 		return this.voice;
 	}
