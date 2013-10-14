@@ -8,18 +8,21 @@ import java.awt.event.ActionEvent;
 import java.io.*;
 import java.util.Date;
 import java.text.SimpleDateFormat;
+import sun.audio.*;
 
 public class Recorder extends JPanel
 {
 	private String fileName = null;
 	private String soundDir = "files/sound/";
-	private final String startRecord = "开始录音";
-	private final String stopRecord = "停止录音";
+	private final String startRecord = "Record";
+	private final String stopRecord = "Stop";
+	private final String startPlay = "Play";
 	private Thread recordThread = null;
 	private AudioInputStream audioInputStream = null;
+	private byte[] recordBytes = null;
 	private AudioFileFormat.Type type = AudioFileFormat.Type.WAVE;
-	
-	private JButton recordButton = null;
+        
+    private int a = 0;
 	
 	public Recorder()
 	{
@@ -28,25 +31,6 @@ public class Recorder extends JPanel
 	
 	private void init()
 	{
-		recordButton = new JButton(startRecord);
-		recordButton.addActionListener(new ActionListener()
-		{
-			public void actionPerformed(ActionEvent e)
-			{
-				if(recordButton.getText().equals(startRecord))
-				{
-					recordButton.setText(stopRecord);
-					startRecord();
-				}
-				else if (recordButton.getText().equals(stopRecord))
-				{
-					stopRecord();
-					recordButton.setText(startRecord);
-				}
-			}
-		});
-		
-		this.add(recordButton);
 	}
 	
 	public String getSoundDir()
@@ -69,16 +53,23 @@ public class Recorder extends JPanel
 		this.fileName = fileName;
 	}
 	
-	private void startRecord()
+	public void startRecord()
 	{
-		Record record = new Record();
+        a = 1;
+		Recorder.Record record = new Recorder.Record(Recorder.Record.RECORD);
 		recordThread = new Thread(record, "Record");
 		recordThread.start();
 	}
 	
-	private void stopRecord()
+	public void stopRecord()
 	{
+            //System.out.println("stopRecord: " + a);
 		recordThread = null;
+                    
+            while(recordBytes == null)
+            {
+            	System.out.println("");
+            }
 	}
 	
 	private boolean saveRecord()
@@ -90,7 +81,7 @@ public class Recorder extends JPanel
 		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMddHHmmss");
 		fileName = "record" + dateFormat.format(new Date()) + ".wav";
 		
-		//初始化存放声音文件的文件夹
+		//??????????????????????
 		if(!soundDir.endsWith("/"))
 		{
 			soundDir += "/";
@@ -112,25 +103,67 @@ public class Recorder extends JPanel
 		return true;
 	}
 	
+	public void setRecord(byte[] recordBytes)
+	{
+		this.recordBytes = new byte[recordBytes.length];
+		for(int i = 0; i < recordBytes.length; ++ i)
+		{
+			this.recordBytes[i] = recordBytes[i];
+		}
+	}
+	
+	public byte[] getRecord()
+        {
+		return this.recordBytes;
+	}
+	
+	public void playRecord(byte[] recordBytes)
+	{
+            while(recordBytes == null){};
+                setRecord(recordBytes);
+		Recorder.Record record = new Recorder.Record(Recorder.Record.PLAY);
+		recordThread = new Thread(record, "Play");
+		recordThread.start();
+	}
+        
+        public void stopPlay()
+        {
+            recordThread = null;
+            
+        }
+	
 	class Record implements Runnable
 	{
-		final float rate = 8000f;//采样率
-		final int sampleSize = 16;//样本大小
-		final boolean bigEndian = true;//是否采用bigEndian方式存储
-		final int channels = 1;//信道数
-		final AudioFormat.Encoding encoding = AudioFormat.Encoding.PCM_SIGNED;//采样方式
+		public static final String RECORD = "Record";
+		public static final String PLAY = "PLAY";
+		private String operation = null;
 		
+		final float rate = 8000f;//??????
+		final int sampleSize = 16;//???С
+		final boolean bigEndian = true;//??????bigEndian????洢
+		final int channels = 1;//?????
+		final AudioFormat.Encoding encoding = AudioFormat.Encoding.PCM_SIGNED;//?????
+		
+		DataLine.Info info = null;
 		AudioFormat format = null;
 		TargetDataLine dataLine = null;
 		
-		public void run()
+		int frameSize;
+		int bufferSize;
+		int bufferLength;
+		
+		public Record(String operation)
+		{
+			this.operation = operation;
+		}
+		
+		private void init()
 		{
 			format = new AudioFormat(encoding, rate, sampleSize, channels, 
 					(sampleSize)/8 * channels, rate, bigEndian);
-			DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
+			info = new DataLine.Info(TargetDataLine.class, format);
 			if(!AudioSystem.isLineSupported(info))
 			{
-				recordButton.setText(startRecord);
 				System.err.println("Line not supported");
 				return;
 			}
@@ -138,18 +171,41 @@ public class Recorder extends JPanel
 			try
 			{
 				dataLine = (TargetDataLine)AudioSystem.getLine(info);
-				dataLine.open(format, dataLine.getBufferSize());
 			}
 			catch(Exception e)
 			{
 				e.printStackTrace();
 				return;
 			}
-			
+			frameSize = format.getFrameSize();
+			bufferSize = dataLine.getBufferSize() / 8;
+			bufferLength = bufferSize * frameSize;
+		}
+		
+		public void run()
+		{
+			init();
+			if(operation.equals(RECORD))
+			{
+				record();
+			}
+			else if(operation.equals(PLAY))
+			{
+				play();
+			}
+		}
+		
+		public void record()
+		{
+			try
+			{
+				dataLine.open(format, dataLine.getBufferSize());
+			}
+			catch(Exception e)
+			{
+				e.printStackTrace();
+			}
 			ByteArrayOutputStream baOutputStream = new ByteArrayOutputStream();
-			int frameSize = format.getFrameSize();
-			int bufferSize = dataLine.getBufferSize() / 8;
-			int bufferLength = bufferSize * frameSize;
 			byte[] data = new byte[bufferLength];
 			int readCount = 0;
 			dataLine.start();
@@ -174,9 +230,9 @@ public class Recorder extends JPanel
 				ioe.printStackTrace();
 			}
 			
-			byte[] audioBytes = baOutputStream.toByteArray();
-			ByteArrayInputStream baInputStream = new ByteArrayInputStream(audioBytes);
-			audioInputStream = new AudioInputStream(baInputStream, format, audioBytes.length / frameSize);
+			recordBytes = baOutputStream.toByteArray();
+			ByteArrayInputStream baInputStream = new ByteArrayInputStream(recordBytes);
+			audioInputStream = new AudioInputStream(baInputStream, format, recordBytes.length / frameSize);
 			
 			try
 			{
@@ -187,7 +243,28 @@ public class Recorder extends JPanel
 				e.printStackTrace();
 				return;
 			}
+			//saveRecord();
+		}
+		
+		public void play()
+		{
+			ByteArrayInputStream baInputStream = new ByteArrayInputStream(recordBytes);
+			audioInputStream = new AudioInputStream(baInputStream, format, recordBytes.length / frameSize);
 			saveRecord();
+			if(recordBytes != null)
+			{
+				try
+				{
+					File file = new File(soundDir + fileName);
+                                        file.deleteOnExit();
+					InputStream in = new FileInputStream(file);
+					AudioPlayer.player.start(in);
+				}
+				catch(Exception ioe)
+				{
+					ioe.printStackTrace();
+				}
+			}
 		}
 	}
 }
